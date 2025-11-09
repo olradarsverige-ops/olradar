@@ -60,22 +60,24 @@ export default function Page(){
   }, [venues, q, style, sort]);
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-amber-50 to-emerald-50">
+    <main className="min-h-screen bg-[#0b0f0e] text-[#e8f5f0]">
       <style>{`
         .container{max-width:1000px;margin:0 auto;padding:16px}
-        .card{border:1px solid #e5e7eb;border-radius:16px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+        .card{border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.03);backdrop-filter: blur(8px);}
         .btn{padding:10px 16px;border-radius:12px;font-weight:700}
-        .btn-primary{background:#059669;color:white}
-        .pill{border:1px solid #e5e7eb;border-radius:9999px;padding:6px 10px;background:#fff}
-        .badge{font-size:10px;padding:2px 6px;border-radius:999px}
+        .btn-primary{background:#11a97c;color:white}
+        .pill{border:1px solid rgba(255,255,255,.1);border-radius:9999px;padding:10px 12px;background:rgba(255,255,255,.06);color:#e8f5f0}
+        input.pill::placeholder{color:#98a6a2}
+        .badge{font-size:10px;padding:2px 6px;border-radius:999px;background:#113f2f;color:#b7f7db}
+        .hero{height:140px;border-radius:16px;object-fit:cover;filter:contrast(1.05) saturate(1.1)}
       `}</style>
 
       <header className="container" style={{display:'flex',alignItems:'center',justifyContent:'space-between', gap:12, paddingTop:12}}>
         <div style={{display:'flex', alignItems:'center', gap:12}}>
-          <img src="https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?q=80&w=160&auto=format&fit=crop" alt="beer" style={{width:40,height:40,borderRadius:12,objectFit:'cover'}}/>
+          <img src="https://images.unsplash.com/photo-1510519138101-570d1dca3d66?q=80&w=160&auto=format&fit=crop" alt="beer" style={{width:40,height:40,borderRadius:12,objectFit:'cover'}}/>
           <div>
             <div style={{fontWeight:800,fontSize:18}}>Ölradar</div>
-            <div style={{fontSize:12, color:'#666'}}>Hitta bästa ölpriset nära dig</div>
+            <div style={{fontSize:12, color:'#9fb7b0'}}>Hitta bästa ölpriset nära dig</div>
           </div>
         </div>
         <div style={{display:'flex', gap:8, alignItems:'center'}}>
@@ -98,26 +100,25 @@ export default function Page(){
         </select>
       </div>
 
-      <div className="container" style={{display:'grid', gridTemplateColumns:'1fr', gap:12}}>
-        {/* hero images row */}
-        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12}}>
-          <img className="card" src="https://images.unsplash.com/photo-1517705008128-361805f42e86?q=80&w=1200&auto=format&fit=crop" alt="" style={{height:120, objectFit:'cover'}}/>
-          <img className="card" src="https://images.unsplash.com/photo-1541552781282-6d10c0bca8b3?q=80&w=1200&auto=format&fit=crop" alt="" style={{height:120, objectFit:'cover'}}/>
-        </div>
+      <div className="container" style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12}}>
+        <img className="hero" src="https://images.unsplash.com/photo-1516450369013-1b87b5280ab1?q=80&w=1200&auto=format&fit=crop" alt="" />
+        <img className="hero" src="https://images.unsplash.com/photo-1545723406-133c16ee34c2?q=80&w=1200&auto=format&fit=crop" alt="" />
+      </div>
 
+      <div className="container" style={{display:'grid', gridTemplateColumns:'1fr', gap:12, marginTop:12}}>
         {filtered.map(v=>(
           <div key={v.id} className="card" style={{padding:14}}>
             <div style={{display:'flex', justifyContent:'space-between'}}>
-              <div><b>{v.name}</b><div style={{color:'#666'}}>{v.city}</div></div>
-              <div><b style={{color:'#0a7f5a'}}>{v.deals?.length ? Math.min(...v.deals.map(d=>d.price)) : '–'} kr</b></div>
+              <div><b>{v.name}</b><div style={{color:'#9fb7b0'}}>{v.city}</div></div>
+              <div><b style={{color:'#36e1a7'}}>{v.deals?.length ? Math.min(...v.deals.map(d=>d.price)) : '–'} kr</b></div>
             </div>
             <div style={{display:'flex', gap:8, overflowX:'auto', marginTop:8}}>
               {v.deals?.map((d,i)=>(
-                <div key={i} className="card" style={{minWidth:220, padding:10, position:'relative'}}>
-                  {d.verified && <span className="badge" style={{position:'absolute', top:6, right:6, background:'#dcfce7', color:'#166534'}}>Verifierad</span>}
+                <div key={i} className="card" style={{minWidth:240, padding:10, position:'relative'}}>
+                  {d.verified && <span className="badge" style={{position:'absolute', top:6, right:6}}>Verifierad</span>}
                   {d.photoUrl && <span title="Foto finns" style={{position:'absolute', top:6, left:10}}>📷</span>}
                   <div style={{fontWeight:700}}>{d.beer}</div>
-                  <div style={{fontSize:12, color:'#666'}}>{d.style}</div>
+                  <div style={{fontSize:12, color:'#9fb7b0'}}>{d.style}</div>
                   <div style={{fontWeight:700}}>{d.price} kr</div>
                   <div style={{fontSize:12}}>⭐ {d.rating}</div>
                 </div>
@@ -125,7 +126,7 @@ export default function Page(){
             </div>
           </div>
         ))}
-        {filtered.length===0 && <div style={{color:'#666'}}>Inga fynd ännu här. Logga första ölen!</div>}
+        {filtered.length===0 && <div style={{color:'#9fb7b0'}}>Inga fynd ännu här. Logga första ölen!</div>}
       </div>
 
       {openLog && (
@@ -148,6 +149,21 @@ function useOutsideClick(ref: any, cb: ()=>void){
   }, [ref, cb]);
 }
 
+// Utility: client-side compress to jpeg (max side 1280, quality 0.82)
+async function compressImage(file: File): Promise<Blob>{
+  const bitmap = await createImageBitmap(file);
+  const { width, height } = bitmap;
+  const maxSide = 1280;
+  const scale = Math.min(1, maxSide / Math.max(width, height));
+  const w = Math.round(width * scale);
+  const h = Math.round(height * scale);
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  return await new Promise<Blob>((resolve)=> canvas.toBlob(b=>resolve(b!), 'image/jpeg', 0.82));
+}
+
 function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: string; venues: Venue[]; onClose: ()=>void; onSaved: ()=>void }){
   const [city, setCity] = useState(defaultCity);
   const [venueName, setVenueName] = useState('');
@@ -166,6 +182,33 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
   const [adminOpen, setAdminOpen] = useState(false);
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
+
+  // drag & drop
+  const dropRef = useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    if(!dropRef.current) return;
+    const el = dropRef.current;
+    const prevent = (e: Event)=>{ e.preventDefault(); e.stopPropagation(); };
+    const onDrop = (e: DragEvent)=>{
+      prevent(e);
+      const f = e.dataTransfer?.files?.[0];
+      if (f) handleFile(f);
+    };
+    ['dragenter','dragover','dragleave','drop'].forEach(t=>el.addEventListener(t, prevent));
+    el.addEventListener('drop', onDrop as any);
+    return ()=>{
+      ['dragenter','dragover','dragleave','drop'].forEach(t=>el.removeEventListener(t, prevent));
+      el.removeEventListener('drop', onDrop as any);
+    };
+  }, []);
+
+  async function handleFile(f: File){
+    // compress
+    const blob = await compressImage(f);
+    const compressedFile = new File([blob], f.name.replace(/\.[^/.]+$/, '.jpg'), { type: 'image/jpeg' });
+    setPhoto(compressedFile);
+    setPhotoPreview(URL.createObjectURL(compressedFile));
+  }
 
   // Preload venues for the selected city
   useEffect(()=>{
@@ -221,14 +264,13 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
 
   function onPhoto(e: React.ChangeEvent<HTMLInputElement>){
     const f = e.target.files?.[0] || null;
-    setPhoto(f);
-    setPhotoPreview(f ? URL.createObjectURL(f) : null);
+    if (f) handleFile(f);
   }
 
   async function uploadPhotoIfAny(venueId: string){
     if (!photo) return null;
     setUploading(true);
-    const ext = photo.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const ext = 'jpg';
     const fileName = `${venueId}/${crypto.randomUUID()}.${ext}`;
     const { data, error } = await supabase.storage.from('photos').upload(fileName, photo, {
       cacheControl: '3600',
@@ -266,101 +308,108 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
 
   const isNewVenue = venueName.trim().length>0 && !venuePool.some(v => v.name.toLowerCase()===venueName.toLowerCase());
   const canSave = (!verified || distanceOk) && !!venueName && !!beer && price>0;
-  const pointsPreview = 5 + (verified?3:0) + 10; // simple preview (first logger bonus optimistic)
+  const pointsPreview = 5 + (verified?3:0) + 10; // optimistic first-logger
 
   return (
-    <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,.3)', display:'grid', placeItems:'center', padding:12}}>
-      <div className="card" style={{padding:14, width:'100%', maxWidth:640}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-          <div style={{fontWeight:700, fontSize:16}}>Logga en öl</div>
+    <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,.45)', display:'grid', placeItems:'center', padding:12}}>
+      <div className="card" style={{padding:18, width:'100%', maxWidth:760}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
+          <div style={{fontWeight:700, fontSize:18}}>Logga en öl</div>
           <button onClick={onClose} className="pill">✕</button>
         </div>
-        <div style={{display:'grid', gap:10, marginTop:10}}>
-          <div style={{display:'grid', gap:8, gridTemplateColumns:'1fr 1fr'}}>
+
+        <div style={{display:'grid', gap:10}}>
+          {/* Stad + ställe */}
+          <div style={{display:'grid', gap:8, gridTemplateColumns:'180px 1fr auto'}} ref={venueBoxRef}>
             <select className="pill" value={city} onChange={e=>setCity(e.target.value)}>
               {['Helsingborg','Stockholm','Göteborg','Malmö'].map(c=><option key={c} value={c}>{c}</option>)}
             </select>
-            <div ref={venueBoxRef} style={{position:'relative'}}>
-              <input className="pill" value={venueName}
-                onChange={e=>{ setVenueName(e.target.value); setVenueOpen(true); setShowInfo(false); }}
-                onFocus={()=>setVenueOpen(true)}
-                placeholder="Ställe – välj från listan eller skriv nytt" />
-              {venueOpen && (
-                <div className="card" style={{position:'absolute', zIndex:30, top:'110%', left:0, right:0, maxHeight:220, overflow:'auto', padding:6}}>
-                  {filteredVenues.map(n=>(
-                    <div key={n} className="pill" style={{margin:4, cursor:'pointer'}} onMouseDown={()=>{ setVenueName(n); setVenueOpen(false); }}>
-                      {n}
-                    </div>
-                  ))}
-                  {isNewVenue && (
-                    <div className="pill" style={{margin:4, cursor:'pointer', background:'#ecfeff', borderColor:'#a5f3fc'}}
-                      onMouseDown={()=>{ setShowInfo(true); setVenueOpen(false); }}>
-                      + Skapa nytt ställe: “{venueName}”
-                    </div>
-                  )}
-                  {filteredVenues.length===0 && !isNewVenue && <div style={{padding:8, color:'#666'}}>Inga ställen i listan.</div>}
-                </div>
-              )}
-            </div>
+            <input className="pill" value={venueName}
+              onChange={e=>{ setVenueName(e.target.value); setVenueOpen(true); setShowInfo(false); }}
+              onFocus={()=>setVenueOpen(true)}
+              placeholder="Ställe – välj från listan eller skriv nytt" />
+            <button
+              className="pill"
+              title="Öppna mini-admin (lat/lng)"
+              onClick={()=>{ setAdminOpen(s=>!s); setShowInfo(true); }}
+            >⚙ Admin</button>
+
+            {venueOpen && (
+              <div className="card" style={{position:'absolute', zIndex:30, top:'110%', left:196, right:74, maxHeight:240, overflow:'auto', padding:6}}>
+                {filteredVenues.map(n=>(
+                  <div key={n} className="pill" style={{margin:4, cursor:'pointer'}}
+                       onMouseDown={()=>{ setVenueName(n); setVenueOpen(false); }}>
+                    {n}
+                  </div>
+                ))}
+                {isNewVenue && (
+                  <div className="pill" style={{margin:4, cursor:'pointer', background:'#0e2e27'}}
+                       onMouseDown={()=>{ setShowInfo(true); setVenueOpen(false); }}>
+                    + Skapa nytt ställe: “{venueName}”
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Info puck if creating new */}
+          {/* Info puck + mini-admin */}
           {showInfo && (
-            <div className="card" style={{padding:10, background:'#fff7ed', borderColor:'#fed7aa'}}>
-              <b>Obs!</b> För att kunna markera loggen som <i>Verifierad</i> behöver stället ha koordinater (lat/lng).
-              Lägg in koordinater nedan så funkar GPS-checken direkt.
+            <div className="card" style={{padding:10, background:'rgba(255,184,77,.08)', borderColor:'rgba(255,184,77,.3)'}}>
+              <b>Obs!</b> <i>Verifierad</i> kräver koordinater (lat/lng). Lägg in dem nedan så funkar GPS-checken direkt.
               <div style={{marginTop:8}}>
-                <button className="pill" onClick={()=>setAdminOpen(v=>!v)}>{adminOpen? 'Dölj admin' : 'Öppna mini-admin (lat/lng)'}</button>
+                <button className="btn btn-primary" onClick={()=>setAdminOpen(v=>!v)}>{adminOpen? 'Dölj admin' : 'Öppna mini-admin (lat/lng)'}</button>
               </div>
             </div>
           )}
 
-          {/* Mini admin for lat/lng */}
           {adminOpen && (
             <div className="card" style={{padding:10}}>
-              <div style={{fontWeight:600, marginBottom:6}}>Sätt koordinater för “{venueName}”</div>
+              <div style={{fontWeight:600, marginBottom:6}}>Sätt koordinater för “{venueName||'—'}”</div>
               <div style={{display:'grid', gap:8, gridTemplateColumns:'1fr 1fr'}}>
                 <input className="pill" placeholder="Latitud" value={lat} onChange={e=>setLat(e.target.value)} />
                 <input className="pill" placeholder="Longitud" value={lng} onChange={e=>setLng(e.target.value)} />
               </div>
               <div style={{marginTop:8, display:'flex', gap:8}}>
                 <button className="btn btn-primary" onClick={upsertVenueCoords}>Spara koordinater</button>
-                <div style={{fontSize:12, color:'#666'}}>Tips: Hämta via Google Maps → högerklick → kopiera lat/lng.</div>
+                <div style={{fontSize:12, color:'#9fb7b0'}}>Tips: Högerklick i Google Maps → kopiera lat/lng.</div>
               </div>
             </div>
           )}
 
-          {/* Beer + style */}
-          <div ref={beerBoxRef} style={{position:'relative'}}>
-            <input className="pill" value={beer} onChange={e=>{ setBeer(e.target.value); setBeerOpen(true); }}
-              onFocus={()=>setBeerOpen(true)} placeholder="Ölnamn – välj från listan eller skriv nytt" />
-            {beerOpen && filteredBeers.length>0 && (
-              <div className="card" style={{position:'absolute', zIndex:30, top:'110%', left:0, right:0, maxHeight:220, overflow:'auto', padding:6}}>
-                {filteredBeers.map(n=>(
-                  <div key={n} className="pill" style={{margin:4, cursor:'pointer'}} onMouseDown={()=>{ setBeer(n); setBeerOpen(false); }}>{n}</div>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Öl + stil + pris */}
+          <div style={{display:'grid', gap:8, gridTemplateColumns:'1fr 220px 180px'}}>
+            <div ref={beerBoxRef} style={{position:'relative'}}>
+              <input className="pill" value={beer} onChange={e=>{ setBeer(e.target.value); setBeerOpen(true); }}
+                onFocus={()=>setBeerOpen(true)} placeholder="Ölnamn – välj från listan eller skriv nytt (långt fält)" />
+              {beerOpen && filteredBeers.length>0 && (
+                <div className="card" style={{position:'absolute', zIndex:30, top:'110%', left:0, right:0, maxHeight:240, overflow:'auto', padding:6}}>
+                  {filteredBeers.map(n=>(
+                    <div key={n} className="pill" style={{margin:4, cursor:'pointer'}} onMouseDown={()=>{ setBeer(n); setBeerOpen(false); }}>{n}</div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
             <select className="pill" value={style} onChange={e=>setStyle(e.target.value)}>
               {STYLES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
+
             <div style={{position:'relative'}}>
               <input className="pill" type="number" value={price} min={20} max={200} onChange={e=>setPrice(parseInt(e.target.value||'0'))} placeholder="Pris" />
-              <span style={{position:'absolute', right:16, top:10, color:'#555'}}>kr</span>
+              <span style={{position:'absolute', right:16, top:10, color:'#9fb7b0'}}>kr</span>
             </div>
           </div>
 
-          <div style={{display:'flex', alignItems:'center', gap:8}}>
+          {/* Betyg + poäng */}
+          <div style={{display:'flex', alignItems:'center', gap:12}}>
             <input type="range" min={0} max={5} step={0.5} value={rating} onChange={e=>setRating(parseFloat(e.target.value))} style={{flex:1}}/>
             <div style={{minWidth:160, textAlign:'right'}}>
               <div>⭐ {rating.toFixed(1)}</div>
-              <div style={{fontWeight:700, color:'#0a7f5a'}}>+{pointsPreview} p</div>
+              <div style={{fontWeight:700, color:'#36e1a7'}}>+{5 + (verified?3:0) + 10} p</div>
             </div>
           </div>
 
+          {/* Verifierad + drag & drop */}
           <div className="card" style={{padding:10}}>
             <label style={{display:'flex', alignItems:'center', gap:8}}>
               <input type="checkbox" checked={verified} onChange={e=>setVerified(e.target.checked)} />
@@ -368,9 +417,12 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
             </label>
             {verified && (
               <div style={{display:'grid', gap:8, marginTop:8}}>
-                <input type="file" accept="image/*" onChange={onPhoto} />
-                {photoPreview && <img src={photoPreview} alt="preview" style={{maxWidth:220, borderRadius:8, border:'1px solid #eee'}} />}
-                <div style={{fontSize:12, color: distanceOk ? '#166534' : '#991b1b'}}>
+                <div ref={dropRef} style={{border:'2px dashed rgba(255,255,255,.15)', borderRadius:12, padding:14, textAlign:'center'}}>
+                  Släpp bild här eller <label style={{textDecoration:'underline', cursor:'pointer'}}><input type="file" accept="image/*" onChange={onPhoto} style={{display:'none'}}/>välj fil</label>
+                  <div style={{fontSize:12, color:'#9fb7b0'}}>Komprimeras automatiskt till JPEG ~1280px</div>
+                </div>
+                {photoPreview && <img src={photoPreview} alt="preview" style={{maxWidth:260, borderRadius:10, border:'1px solid rgba(255,255,255,.1)'}} />}
+                <div style={{fontSize:12, color: distanceOk ? '#8cf8c9' : '#ffb894'}}>
                   {coords ? `GPS: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}` : 'GPS ej tillgänglig'} · {distanceOk ? 'Avstånd OK (<100 m)' : 'För långt från stället / saknar koordinater'}
                 </div>
               </div>
@@ -378,7 +430,7 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
           </div>
         </div>
 
-        <div style={{display:'flex', justifyContent:'flex-end', gap:8, marginTop:10}}>
+        <div style={{display:'flex', justifyContent:'flex-end', gap:8, marginTop:12}}>
           <button onClick={onClose} className="pill">Avbryt</button>
           <button onClick={save} disabled={!canSave || uploading} className="btn btn-primary">
             {uploading ? 'Laddar upp...' : 'Spara'}

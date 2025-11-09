@@ -8,13 +8,12 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const city = searchParams.get('city') || 'Helsingborg';
 
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('venues')
     .select('id,name,city,lat,lng')
     .eq('city', city)
     .order('name', { ascending: true })
     .limit(500);
 
-  if (error || !data) return NextResponse.json([], { status: 200 });
-  return NextResponse.json(data, { status: 200 });
+  return NextResponse.json(data ?? [], { status: 200 });
 }
