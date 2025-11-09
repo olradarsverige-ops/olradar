@@ -1,41 +1,20 @@
 
-# Ölradar – Helsingborg Starter (SE/EN) ✅
+# Ölradar v10 (SE/EN)
 
-Det här paketet är klart att köras med **Helsingborg som default** + en **stadsväljare** i UI:t.
-Innehåller:
-- Next.js (App Router) + minimal UI
-- API: `GET /api/nearby` och `POST /api/log`
-- Uppdaterad **supabase/schema.sql** (policies fixade) + seed för **Helsingborg**
-- .env.example
+- Mörkgrå tema, vit text i inputs
+- Bildfallback + Next images whitelisting
+- Vy-växlare: **Standard** / **Billigast**
+- API-routes: `/api/venues` och `/api/nearby?sort=cheapest&city=Helsingborg`
 
----
+## Miljövariabler (Vercel)
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-## 1) Supabase (gratis)
-1. Skapa projekt → öppna **SQL Editor**.
-2. Klistra in innehållet från **`supabase/schema.sql`** → **Run**.
-   - Tabeller: `venues`, `beers`, `prices`
-   - Vy: `vw_nearby`
-3. Hämta **Project URL** + **anon key** (Project Settings → API).
-
-## 2) Kör lokalt (om du vill)
+## Start lokalt
 ```bash
-npm install
-# Skapa .env.local baserat på .env.example
+npm i
 npm run dev
-# http://localhost:3000
 ```
 
-## 3) Vercel (gratis)
-- Skapa nytt repo på GitHub, ladda upp allt i denna mapp.
-- I Vercel: Importera repo → lägg env-variabler:
-  - `NEXT_PUBLIC_SUPABASE_URL`
-  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- Deploy.
-- Testa `https://din-app.vercel.app/api/nearby?city=Helsingborg`
-
-## 4) Användning
-- Uppe till vänster finns **stadsväljare** (Helsingborg, Stockholm, Göteborg, Malmö).
-- **+ Logga öl** öppnar modal: välj stad + skriv *ställenamn*, öl, stil, pris, betyg → **Spara**.
-- API upsertar bar och öl om de inte finns.
-
-Lycka till! 🍻
+## Deploy
+- Koppla GitHub → Vercel → lägg env-variabler → Deploy.

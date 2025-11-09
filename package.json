@@ -1,22 +1,22 @@
 {
-  "name": "olradar-hbg-starter",
-  "version": "0.3.0",
+  "name": "olradar-v10",
+  "version": "0.10.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
     "next": "14.2.5",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "@supabase/supabase-js": "2.45.3"
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "@supabase/supabase-js": "2.45.4"
   },
   "devDependencies": {
     "typescript": "5.6.3",
-    "@types/node": "20.11.30",
     "@types/react": "18.2.66",
-    "@types/react-dom": "18.2.22"
+    "@types/node": "20.11.30"
   }
 }

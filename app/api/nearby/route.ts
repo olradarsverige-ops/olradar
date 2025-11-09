@@ -2,68 +2,74 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+type Row = {
+  id: string; name: string; city: string; address: string|null;
+  open_now: boolean|null; deals: { beer:string; style:string; price:number; rating:number; updatedAt:string|null }[]|null
+};
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const city = searchParams.get('city') || 'Helsingborg';
+  const city = searchParams.get('city');
+  const sort = searchParams.get('sort'); // 'cheapest' | 'standard'
 
-  // 1) get venues in city
-  const { data: venues, error: vErr } = await supabase
-    .from('venues')
-    .select('id,name,city,lat,lng,open_now')
-    .eq('city', city)
-    .limit(200);
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
-  if (vErr || !venues) return NextResponse.json([], { status: 200 });
+  // Materialize deals per venue via SQL (JSON agg)
+  const sql = `
+    with r as (
+      select v.id, v.name, v.city, v.address, v.open_now,
+        json_agg(
+          json_build_object(
+            'beer', b.name, 'style', b.style,
+            'price', p.price_sek, 'rating', coalesce(p.rating,0),
+            'updatedAt', p.created_at
+          )
+          order by p.price_sek asc
+        ) as deals
+      from venues v
+      left join prices p on p.venue_id = v.id
+      left join beers b on b.id = p.beer_id
+      ${city ? 'where v.city = :city' : ''}
+      group by v.id
+    )
+    select * from r
+  `;
 
-  const venueIds = venues.map(v => v.id);
-  if (venueIds.length === 0) return NextResponse.json([], { status: 200 });
+  const { data, error } = await supabase.rpc('exec_sql', { sql, params: { city } } as any)
+    .select<Row>();
 
-  // 2) get latest prices for those venues (join beers)
-  const { data: prices, error: pErr } = await supabase
-    .from('prices')
-    .select('venue_id, price_sek, rating, verified, photo_url, created_at, beers(name,style)')
-    .in('venue_id', venueIds)
-    .order('created_at', { ascending: false })
-    .limit(1000);
+  // Fallback if rpc/exec_sql is not enabled: do it in 2 queries
+  let rows: Row[] = [];
+  if (error) {
+    const vq = supabase.from('venues').select('id,name,city,address,open_now' + (city ? '').toString()).eq('city', city || '');
+    const vres = city ? await vq.eq('city', city) : await vq;
+    if (vres.error) return NextResponse.json({ error: vres.error.message }, { status: 500 });
+    const venues = vres.data ?? [];
+    const pres = await supabase.from('prices').select('venue_id, price_sek, rating, created_at, beer_id');
+    const bres = await supabase.from('beers').select('id,name,style');
+    const beersById = new Map((bres.data||[]).map((b:any)=>[b.id,b]));
 
-  if (pErr || !prices) {
-    return NextResponse.json(venues.map(v => ({ id:v.id, name:v.name, city:v.city, lat:v.lat, lng:v.lng, openNow:v.open_now, deals: [] })), { status: 200 });
+    rows = venues.map((v:any)=>{
+      const deals = (pres.data||[]).filter((p:any)=>p.venue_id===v.id).map((p:any)=>{
+        const b = beersById.get(p.beer_id) || { name:'', style:'' };
+        return { beer:b.name, style:b.style, price:p.price_sek, rating:p.rating||0, updatedAt:p.created_at };
+      }).sort((a:any,b:any)=>a.price-b.price);
+      return { ...v, deals };
+    });
+  } else {
+    rows = (data||[]) as any;
   }
 
-  // 3) group per venue, take top 3 (handle both object and array shape for 'beers')
-  const grouped: Record<string, any[]> = {};
-  for (const row of prices as any[]) {
-    const key = row.venue_id as string;
-    if (!grouped[key]) grouped[key] = [];
-
-    const b = (row as any).beers;
-    const beerName = Array.isArray(b) ? b[0]?.name : b?.name;
-    const beerStyle = Array.isArray(b) ? b[0]?.style : b?.style;
-
-    if (grouped[key].length < 3 && beerName) {
-      grouped[key].push({
-        beer: beerName,
-        style: beerStyle ?? null,
-        price: row.price_sek,
-        rating: row.rating ?? 0,
-        verified: row.verified ?? false,
-        photoUrl: row.photo_url ?? null,
-        updatedAt: row.created_at,
-      });
-    }
+  // Sorting
+  if (sort === 'cheapest') {
+    rows.sort((a:any,b:any)=>{
+      const ap = a.deals?.length ? Math.min(...a.deals.map((d:any)=>d.price)) : Number.POSITIVE_INFINITY;
+      const bp = b.deals?.length ? Math.min(...b.deals.map((d:any)=>d.price)) : Number.POSITIVE_INFINITY;
+      return ap - bp;
+    });
+  } else {
+    rows.sort((a:any,b:any)=> (b.open_now?1:0) - (a.open_now?1:0));
   }
 
-  const resp = venues.map(v => ({
-    id: v.id,
-    name: v.name,
-    city: v.city,
-    lat: v.lat,
-    lng: v.lng,
-    openNow: v.open_now ?? true,
-    deals: grouped[v.id] ?? []
-  }));
-
-  return NextResponse.json(resp);
+  return NextResponse.json(rows);
 }
