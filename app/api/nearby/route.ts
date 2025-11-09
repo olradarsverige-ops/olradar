@@ -1,6 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
 export async function GET(req: Request) {
@@ -13,6 +14,7 @@ export async function GET(req: Request) {
     .select('id,name,city,lat,lng,open_now')
     .eq('city', city)
     .limit(200);
+
   if (vErr || !venues) return NextResponse.json([], { status: 200 });
 
   const venueIds = venues.map(v => v.id);
@@ -25,19 +27,25 @@ export async function GET(req: Request) {
     .in('venue_id', venueIds)
     .order('created_at', { ascending: false })
     .limit(1000);
+
   if (pErr || !prices) {
     return NextResponse.json(venues.map(v => ({ id:v.id, name:v.name, city:v.city, lat:v.lat, lng:v.lng, openNow:v.open_now, deals: [] })), { status: 200 });
   }
 
-  // 3) group per venue, take top 3
+  // 3) group per venue, take top 3 (handle both object and array shape for 'beers')
   const grouped: Record<string, any[]> = {};
-  for (const row of prices) {
+  for (const row of prices as any[]) {
     const key = row.venue_id as string;
     if (!grouped[key]) grouped[key] = [];
-    if (grouped[key].length < 3 && row.beers) {
+
+    const b = (row as any).beers;
+    const beerName = Array.isArray(b) ? b[0]?.name : b?.name;
+    const beerStyle = Array.isArray(b) ? b[0]?.style : b?.style;
+
+    if (grouped[key].length < 3 && beerName) {
       grouped[key].push({
-        beer: row.beers.name,
-        style: row.beers.style,
+        beer: beerName,
+        style: beerStyle ?? null,
         price: row.price_sek,
         rating: row.rating ?? 0,
         verified: row.verified ?? false,
