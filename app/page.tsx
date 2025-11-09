@@ -96,7 +96,6 @@ export default function Page(){
             <div style={{display:'flex', gap:8, overflowX:'auto', marginTop:8}}>
               {v.deals?.map((d,i)=>(
                 <div key={i} style={{minWidth:200, border:'1px solid #eee', borderRadius:10, padding:10, position:'relative'}}>
-                  {/* badges */}
                   {d.verified && <span style={{position:'absolute', top:6, right:6, background:'#dcfce7', color:'#166534', fontSize:10, padding:'2px 6px', borderRadius:999}}>Verifierad</span>}
                   {d.photoUrl && <span title="Foto finns" style={{position:'absolute', top:6, left:6, fontSize:12}}>📷</span>}
                   <div style={{fontWeight:600, fontSize:14}}>{d.beer}</div>
@@ -164,14 +163,17 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
   useOutsideClick(venueBoxRef, ()=>setVenueOpen(false));
   useOutsideClick(beerBoxRef, ()=>setBeerOpen(false));
 
-  const filteredVenues = useMemo(()=> venuePool
-      .filter(v => v.name.toLowerCase().includes(venueName.toLowerCase()))
-      .slice(0,8), [venuePool, venueName]);
+  const topVenues = useMemo(()=> venuePool.map(v=>v.name).slice(0,8), [venuePool]);
+  const filteredVenues = useMemo(()=>{
+    const q = venueName.trim().toLowerCase();
+    if (!q) return topVenues;
+    return venuePool.filter(v => v.name.toLowerCase().includes(q)).map(v=>v.name).slice(0,8);
+  }, [venuePool, venueName, topVenues]);
+
   const filteredBeers = useMemo(()=> beerSource
       .filter(n => n.toLowerCase().includes(beer.toLowerCase()))
       .slice(0,8), [beerSource, beer]);
 
-  // GPS capture if verified toggled
   useEffect(()=>{
     if (!verified) { setCoords(null); setDistanceOk(true); return; }
     if (!navigator.geolocation) { setCoords(null); setDistanceOk(false); return; }
@@ -179,11 +181,10 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
       (pos)=> {
         const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setCoords(c);
-        // compute distance if venue known with coords
         const v = venuePool.find(x => x.name.toLowerCase() === venueName.toLowerCase());
         if (v && v.lat && v.lng){
           const km = haversineKm(c, {lat: v.lat, lng: v.lng});
-          setDistanceOk(km <= 0.1); // 100 m
+          setDistanceOk(km <= 0.1);
         } else {
           setDistanceOk(false);
         }
@@ -250,35 +251,38 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
             {['Helsingborg','Stockholm','Göteborg','Malmö'].map(c=><option key={c} value={c}>{c}</option>)}
           </select>
 
-          {/* Venue combobox */}
           <div ref={venueBoxRef} style={{position:'relative'}}>
             <input
               value={venueName}
               onChange={e=>{ setVenueName(e.target.value); setVenueOpen(true); }}
               onFocus={()=>setVenueOpen(true)}
-              placeholder="Ställe (ex. Charles Dickens) – välj eller skriv nytt"
+              placeholder="Ställe – välj från listan eller skriv nytt"
               style={{width:'100%', padding:'8px 10px', border:'1px solid #ddd', borderRadius:10}}
             />
-            {venueOpen && filteredVenues.length>0 && (
-              <div style={{position:'absolute', zIndex:20, top:'100%', left:0, right:0, background:'#fff', border:'1px solid #ddd', borderRadius:10, marginTop:4, maxHeight:200, overflow:'auto'}}>
-                {filteredVenues.map(v=>(
-                  <div key={v.id} onMouseDown={()=>{ setVenueName(v.name); setVenueOpen(false); }} style={{padding:'8px 10px', cursor:'pointer'}}>{v.name}</div>
+            {venueOpen && (
+              <div style={{position:'absolute', zIndex:20, top:'100%', left:0, right:0, background:'#fff', border:'1px solid #ddd', borderRadius:10, marginTop:4, maxHeight:220, overflow:'auto'}}>
+                {filteredVenues.map(n=>(
+                  <div key={n} onMouseDown={()=>{ setVenueName(n); setVenueOpen(false); }} style={{padding:'8px 10px', cursor:'pointer'}}>{n}</div>
                 ))}
+                {venueName and not filteredVenues.__contains__(venueName) and (
+                  <div onMouseDown={()=>{ setVenueName(venueName); setVenueOpen(false); }} style={{padding:'8px 10px', cursor:'pointer', color:'#065f46', borderTop:'1px solid #eee'}}>
+                    + Skapa nytt ställe: “{venueName}”
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          {/* Beer combobox */}
           <div ref={beerBoxRef} style={{position:'relative'}}>
             <input
               value={beer}
               onChange={e=>{ setBeer(e.target.value); setBeerOpen(true); }}
               onFocus={()=>setBeerOpen(true)}
-              placeholder="Ölnamn (ex. Mariestads) – välj eller skriv nytt"
+              placeholder="Ölnamn – välj från listan eller skriv nytt"
               style={{width:'100%', padding:'8px 10px', border:'1px solid #ddd', borderRadius:10}}
             />
             {beerOpen && filteredBeers.length>0 && (
-              <div style={{position:'absolute', zIndex:20, top:'100%', left:0, right:0, background:'#fff', border:'1px solid #ddd', borderRadius:10, marginTop:4, maxHeight:200, overflow:'auto'}}>
+              <div style={{position:'absolute', zIndex:20, top:'100%', left:0, right:0, background:'#fff', border:'1px solid #ddd', borderRadius:10, marginTop:4, maxHeight:220, overflow:'auto'}}>
                 {filteredBeers.map(n=>(
                   <div key={n} onMouseDown={()=>{ setBeer(n); setBeerOpen(false); }} style={{padding:'8px 10px', cursor:'pointer'}}>{n}</div>
                 ))}
@@ -307,11 +311,10 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
             <input type="range" min={0} max={5} step={0.5} value={rating} onChange={e=>setRating(parseFloat(e.target.value))} style={{flex:1}}/>
             <div style={{minWidth:140, textAlign:'right'}}>
               <div>⭐ {rating.toFixed(1)}</div>
-              <div style={{fontWeight:700, color:'#0a7f5a'}}>+{pointsPreview} p</div>
+              <div style={{fontWeight:700, color:'#0a7f5a'}}>+{5 + ( (venues.find(v => v.name.toLowerCase()===venueName.toLowerCase())?.deals.some(d=>d.beer.toLowerCase()===beer.toLowerCase()) ? 0 : 10) ) + (verified?3:0)} p</div>
             </div>
           </div>
 
-          {/* Verified block */}
           <div style={{border:'1px dashed #ddd', borderRadius:10, padding:10}}>
             <label style={{display:'flex', alignItems:'center', gap:8}}>
               <input type="checkbox" checked={verified} onChange={e=>setVerified(e.target.checked)} />
@@ -321,25 +324,18 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
               <div style={{display:'grid', gap:8, marginTop:8}}>
                 <input type="file" accept="image/*" onChange={onPhoto} />
                 {photoPreview && <img src={photoPreview} alt="preview" style={{maxWidth:220, borderRadius:8, border:'1px solid #eee'}} />}
-                <div style={{fontSize:12, color: distanceOk ? '#166534' : '#991b1b'}}>
+                <div style={{fontSize:12}}>
                   {coords ? `GPS: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}` : 'GPS ej tillgänglig'}
-                  {' · '}
-                  {distanceOk ? 'Avstånd OK (<100 m)' : 'För långt från stället / saknar koordinater'}
                 </div>
               </div>
             )}
           </div>
         </div>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10}}>
-          <div style={{fontSize:12, color:'#666'}}>
-            Poäng: 5 bas{isFirstLogger ? ' + 10 först på plats' : ''}{verified ? ' + 3 verifierad' : ''}
-          </div>
-          <div style={{display:'flex', gap:8}}>
-            <button onClick={onClose} style={{padding:'8px 12px', borderRadius:10, border:'1px solid #ddd'}}>Avbryt</button>
-            <button onClick={save} disabled={!canSave || uploading} style={{padding:'8px 12px', borderRadius:10, background: (!canSave||uploading)?'#9ca3af':'#059669', color:'#fff', fontWeight:700}}>
-              {uploading ? 'Laddar upp...' : 'Spara'}
-            </button>
-          </div>
+        <div style={{display:'flex', justifyContent:'flex-end', gap:8, marginTop:10}}>
+          <button onClick={onClose} style={{padding:'8px 12px', borderRadius:10, border:'1px solid #ddd'}}>Avbryt</button>
+          <button onClick={save} disabled={!((!verified || distanceOk) && !!venueName && !!beer && price>0) || uploading} style={{padding:'8px 12px', borderRadius:10, background: ((!verified || distanceOk) && !!venueName && !!beer && price>0 && !uploading)?'#059669':'#9ca3af', color:'#fff', fontWeight:700}}>
+            {uploading ? 'Laddar upp...' : 'Spara'}
+          </button>
         </div>
       </div>
     </div>
