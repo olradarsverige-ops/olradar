@@ -1,13 +1,21 @@
 
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 
 type Deal = { beer: string; style: string; price: number; rating: number; updatedAt: string };
 type Venue = { id: string; name: string; city: string; deals: Deal[]; openNow: boolean };
 
 const CITIES = ['Helsingborg','Stockholm','Göteborg','Malmö'] as const;
 type City = typeof CITIES[number];
-const STYLES = ['Lager','IPA','Pilsner','Stout'] as const;
+
+// Expanded styles
+const STYLES = [
+  'Lager','Pilsner','Helles','Kölsch','Märzen','Dunkel','Bock','Doppelbock',
+  'IPA','New England IPA','Session IPA','Double IPA','Pale Ale','APA','Amber Ale','Brown Ale',
+  'Stout','Imperial Stout','Porter','Oatmeal Stout',
+  'Wheat','Hefeweizen','Witbier','Belgian Blonde','Saison',
+  'Sour','Berliner Weisse','Gose'
+] as const;
 
 export default function Page(){
   const [city, setCity] = useState<City>('Helsingborg');
@@ -88,18 +96,40 @@ export default function Page(){
   );
 }
 
+function useOutsideClick(ref: any, cb: ()=>void){
+  useEffect(()=>{
+    function handle(e: MouseEvent){ if(ref.current && !ref.current.contains(e.target as Node)) cb(); }
+    document.addEventListener('mousedown', handle);
+    return ()=>document.removeEventListener('mousedown', handle);
+  }, [ref, cb]);
+}
+
 function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: string; venues: Venue[]; onClose: ()=>void; onSaved: ()=>void }){
   const [city, setCity] = useState(defaultCity);
   const [venueName, setVenueName] = useState('');
   const [beer, setBeer] = useState('');
-  const [style, setStyle] = useState<typeof STYLES[number]>('Lager');
+  const [style, setStyle] = useState<string>('Lager');
   const [price, setPrice] = useState(59);
   const [rating, setRating] = useState(4);
 
-  // lista med befintliga ställen i vald stad (förslag)
-  const venueOptions = useMemo(() => {
-    return venues.filter(v => v.city === city).map(v => v.name).sort();
+  // source lists
+  const venueSource = useMemo(() => venues.filter(v => v.city === city).map(v => v.name).sort(), [venues, city]);
+  const beerSource = useMemo(() => {
+    const s = new Set<string>();
+    venues.filter(v=>v.city===city).forEach(v => v.deals?.forEach(d => s.add(d.beer)));
+    return Array.from(s).sort();
   }, [venues, city]);
+
+  // simple comboboxes
+  const [venueOpen, setVenueOpen] = useState(false);
+  const [beerOpen, setBeerOpen] = useState(false);
+  const venueBoxRef = useRef<HTMLDivElement>(null);
+  const beerBoxRef = useRef<HTMLDivElement>(null);
+  useOutsideClick(venueBoxRef, ()=>setVenueOpen(false));
+  useOutsideClick(beerBoxRef, ()=>setBeerOpen(false));
+
+  const filteredVenues = useMemo(()=> venueSource.filter(n => n.toLowerCase().includes(venueName.toLowerCase())).slice(0,6), [venueSource, venueName]);
+  const filteredBeers = useMemo(()=> beerSource.filter(n => n.toLowerCase().includes(beer.toLowerCase())).slice(0,6), [beerSource, beer]);
 
   async function save(){
     await fetch('/api/log', {
@@ -112,7 +142,7 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
 
   return (
     <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,.3)', display:'grid', placeItems:'center', padding:12}}>
-      <div style={{background:'#fff', border:'1px solid #ddd', borderRadius:12, padding:14, width:'100%', maxWidth:460}}>
+      <div style={{background:'#fff', border:'1px solid #ddd', borderRadius:12, padding:14, width:'100%', maxWidth:480}}>
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
           <div style={{fontWeight:700}}>Logga en öl</div>
           <button onClick={onClose} style={{color:'#666'}}>✕</button>
@@ -123,32 +153,48 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
             {['Helsingborg','Stockholm','Göteborg','Malmö'].map(c=><option key={c} value={c}>{c}</option>)}
           </select>
 
-          {/* Ställe – med datalist/auto-complete */}
-          <input
-            value={venueName}
-            onChange={e=>setVenueName(e.target.value)}
-            list="venue-list"
-            placeholder="Ställe (ex. Charles Dickens) – välj eller skriv nytt"
-            style={{padding:'8px 10px', border:'1px solid #ddd', borderRadius:10}}
-          />
-          <datalist id="venue-list">
-            {venueOptions.map(n => <option key={n} value={n} />)}
-          </datalist>
+          {/* Venue combobox */}
+          <div ref={venueBoxRef} style={{position:'relative'}}>
+            <input
+              value={venueName}
+              onChange={e=>{ setVenueName(e.target.value); setVenueOpen(true); }}
+              onFocus={()=>setVenueOpen(true)}
+              placeholder="Ställe (ex. Charles Dickens) – välj eller skriv nytt"
+              style={{width:'100%', padding:'8px 10px', border:'1px solid #ddd', borderRadius:10}}
+            />
+            {venueOpen && filteredVenues.length>0 && (
+              <div style={{position:'absolute', zIndex:20, top:'100%', left:0, right:0, background:'#fff', border:'1px solid #ddd', borderRadius:10, marginTop:4, maxHeight:180, overflow:'auto'}}>
+                {filteredVenues.map(n=>(
+                  <div key={n} onMouseDown={()=>{ setVenueName(n); setVenueOpen(false); }} style={{padding:'8px 10px', cursor:'pointer'}}>{n}</div>
+                ))}
+              </div>
+            )}
+          </div>
 
-          {/* Ölnamn (inte stil) */}
-          <input
-            value={beer}
-            onChange={e=>setBeer(e.target.value)}
-            placeholder="Ölnamn (ex. Mariestads)"
-            style={{padding:'8px 10px', border:'1px solid #ddd', borderRadius:10}}
-          />
+          {/* Beer combobox */}
+          <div ref={beerBoxRef} style={{position:'relative'}}>
+            <input
+              value={beer}
+              onChange={e=>{ setBeer(e.target.value); setBeerOpen(true); }}
+              onFocus={()=>setBeerOpen(true)}
+              placeholder="Ölnamn (ex. Mariestads) – välj eller skriv nytt"
+              style={{width:'100%', padding:'8px 10px', border:'1px solid #ddd', borderRadius:10}}
+            />
+            {beerOpen && filteredBeers.length>0 && (
+              <div style={{position:'absolute', zIndex:20, top:'100%', left:0, right:0, background:'#fff', border:'1px solid #ddd', borderRadius:10, marginTop:4, maxHeight:180, overflow:'auto'}}>
+                {filteredBeers.map(n=>(
+                  <div key={n} onMouseDown={()=>{ setBeer(n); setBeerOpen(false); }} style={{padding:'8px 10px', cursor:'pointer'}}>{n}</div>
+                ))}
+              </div>
+            )}
+          </div>
 
-          {/* Stil – EN dropdown (inte dubbelt) */}
-          <select value={style} onChange={e=>setStyle(e.target.value as any)} style={{padding:'8px 10px', border:'1px solid #ddd', borderRadius:10}}>
+          {/* Style dropdown (expanded list) */}
+          <select value={style} onChange={e=>setStyle(e.target.value)} style={{padding:'8px 10px', border:'1px solid #ddd', borderRadius:10}}>
             {STYLES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
 
-          {/* Pris – med "kr" suffix */}
+          {/* Price with suffix */}
           <div style={{position:'relative'}}>
             <input
               type="number"
@@ -162,7 +208,7 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
             <span style={{position:'absolute', right:10, top:8, color:'#555'}}>kr</span>
           </div>
 
-          {/* Betyg – visa aktuell siffra */}
+          {/* Rating with live number */}
           <div style={{display:'flex', alignItems:'center', gap:8}}>
             <input type="range" min={0} max={5} step={0.5} value={rating} onChange={e=>setRating(parseFloat(e.target.value))} style={{flex:1}}/>
             <div style={{minWidth:48, textAlign:'right'}}>⭐ {rating.toFixed(1)}</div>
