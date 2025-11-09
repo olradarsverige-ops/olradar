@@ -145,6 +145,7 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
   const [venuePool, setVenuePool] = useState<VenueLite[]>([]);
   const [distanceOk, setDistanceOk] = useState(true);
 
+  // Preload venues for the selected city
   useEffect(()=>{
     fetch('/api/venues?city='+encodeURIComponent(city))
       .then(r=>r.json()).then(setVenuePool).catch(()=>setVenuePool([]));
@@ -174,6 +175,7 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
       .filter(n => n.toLowerCase().includes(beer.toLowerCase()))
       .slice(0,8), [beerSource, beer]);
 
+  // GPS + distance check for verified
   useEffect(()=>{
     if (!verified) { setCoords(null); setDistanceOk(true); return; }
     if (!navigator.geolocation) { setCoords(null); setDistanceOk(false); return; }
@@ -251,6 +253,7 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
             {['Helsingborg','Stockholm','Göteborg','Malmö'].map(c=><option key={c} value={c}>{c}</option>)}
           </select>
 
+          {/* Venue combobox with preload and create-new option */}
           <div ref={venueBoxRef} style={{position:'relative'}}>
             <input
               value={venueName}
@@ -264,7 +267,7 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
                 {filteredVenues.map(n=>(
                   <div key={n} onMouseDown={()=>{ setVenueName(n); setVenueOpen(false); }} style={{padding:'8px 10px', cursor:'pointer'}}>{n}</div>
                 ))}
-                {venueName and not filteredVenues.__contains__(venueName) and (
+                {venueName && !filteredVenues.includes(venueName) && (
                   <div onMouseDown={()=>{ setVenueName(venueName); setVenueOpen(false); }} style={{padding:'8px 10px', cursor:'pointer', color:'#065f46', borderTop:'1px solid #eee'}}>
                     + Skapa nytt ställe: “{venueName}”
                   </div>
@@ -273,6 +276,7 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
             )}
           </div>
 
+          {/* Beer combobox */}
           <div ref={beerBoxRef} style={{position:'relative'}}>
             <input
               value={beer}
@@ -311,10 +315,11 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
             <input type="range" min={0} max={5} step={0.5} value={rating} onChange={e=>setRating(parseFloat(e.target.value))} style={{flex:1}}/>
             <div style={{minWidth:140, textAlign:'right'}}>
               <div>⭐ {rating.toFixed(1)}</div>
-              <div style={{fontWeight:700, color:'#0a7f5a'}}>+{5 + ( (venues.find(v => v.name.toLowerCase()===venueName.toLowerCase())?.deals.some(d=>d.beer.toLowerCase()===beer.toLowerCase()) ? 0 : 10) ) + (verified?3:0)} p</div>
+              <div style={{fontWeight:700, color:'#0a7f5a'}}>+{pointsPreview} p</div>
             </div>
           </div>
 
+          {/* Verified block */}
           <div style={{border:'1px dashed #ddd', borderRadius:10, padding:10}}>
             <label style={{display:'flex', alignItems:'center', gap:8}}>
               <input type="checkbox" checked={verified} onChange={e=>setVerified(e.target.checked)} />
@@ -324,8 +329,10 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
               <div style={{display:'grid', gap:8, marginTop:8}}>
                 <input type="file" accept="image/*" onChange={onPhoto} />
                 {photoPreview && <img src={photoPreview} alt="preview" style={{maxWidth:220, borderRadius:8, border:'1px solid #eee'}} />}
-                <div style={{fontSize:12}}>
+                <div style={{fontSize:12, color: distanceOk ? '#166534' : '#991b1b'}}>
                   {coords ? `GPS: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}` : 'GPS ej tillgänglig'}
+                  {' · '}
+                  {distanceOk ? 'Avstånd OK (<100 m)' : 'För långt från stället / saknar koordinater'}
                 </div>
               </div>
             )}
@@ -333,7 +340,7 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
         </div>
         <div style={{display:'flex', justifyContent:'flex-end', gap:8, marginTop:10}}>
           <button onClick={onClose} style={{padding:'8px 12px', borderRadius:10, border:'1px solid #ddd'}}>Avbryt</button>
-          <button onClick={save} disabled={!((!verified || distanceOk) && !!venueName && !!beer && price>0) || uploading} style={{padding:'8px 12px', borderRadius:10, background: ((!verified || distanceOk) && !!venueName && !!beer && price>0 && !uploading)?'#059669':'#9ca3af', color:'#fff', fontWeight:700}}>
+          <button onClick={save} disabled={!canSave || uploading} style={{padding:'8px 12px', borderRadius:10, background: (canSave && !uploading)?'#059669':'#9ca3af', color:'#fff', fontWeight:700}}>
             {uploading ? 'Laddar upp...' : 'Spara'}
           </button>
         </div>
