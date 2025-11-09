@@ -1,9 +1,10 @@
 
 'use client';
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type Deal = { beer: string; style: string; price: number; rating: number; updatedAt: string };
 type Venue = { id: string; name: string; city: string; deals: Deal[]; openNow: boolean };
+type VenueLite = { id: string; name: string; city: string };
 
 const CITIES = ['Helsingborg','Stockholm','Göteborg','Malmö'] as const;
 type City = typeof CITIES[number];
@@ -112,8 +113,13 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
   const [price, setPrice] = useState(59);
   const [rating, setRating] = useState(4);
 
-  // source lists
-  const venueSource = useMemo(() => venues.filter(v => v.city === city).map(v => v.name).sort(), [venues, city]);
+  // Suggestions from /api/venues (direct DB) and from nearby deals for beer names
+  const [venuePool, setVenuePool] = useState<VenueLite[]>([]);
+  useEffect(()=>{
+    fetch('/api/venues?city='+encodeURIComponent(city))
+      .then(r=>r.json()).then(setVenuePool).catch(()=>setVenuePool([]));
+  }, [city]);
+
   const beerSource = useMemo(() => {
     const s = new Set<string>();
     venues.filter(v=>v.city===city).forEach(v => v.deals?.forEach(d => s.add(d.beer)));
@@ -128,8 +134,20 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
   useOutsideClick(venueBoxRef, ()=>setVenueOpen(false));
   useOutsideClick(beerBoxRef, ()=>setBeerOpen(false));
 
-  const filteredVenues = useMemo(()=> venueSource.filter(n => n.toLowerCase().includes(venueName.toLowerCase())).slice(0,6), [venueSource, venueName]);
-  const filteredBeers = useMemo(()=> beerSource.filter(n => n.toLowerCase().includes(beer.toLowerCase())).slice(0,6), [beerSource, beer]);
+  const filteredVenues = useMemo(()=> venuePool
+      .filter(v => v.name.toLowerCase().includes(venueName.toLowerCase()))
+      .slice(0,8), [venuePool, venueName]);
+  const filteredBeers = useMemo(()=> beerSource
+      .filter(n => n.toLowerCase().includes(beer.toLowerCase()))
+      .slice(0,8), [beerSource, beer]);
+
+  // Point preview: base 5 +10 if first logger for this beer at venue (naive check)
+  const existingVenue = useMemo(()=> venues.find(v => v.city===city && v.name.toLowerCase() === venueName.toLowerCase()), [venues, city, venueName]);
+  const isFirstLogger = useMemo(()=> {
+    if (!existingVenue || !existingVenue.deals) return true;
+    return !existingVenue.deals.some(d => d.beer.toLowerCase() === beer.toLowerCase());
+  }, [existingVenue, beer]);
+  const pointsPreview = 5 + (isFirstLogger ? 10 : 0); // could add +3 if verified later
 
   async function save(){
     await fetch('/api/log', {
@@ -142,7 +160,7 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
 
   return (
     <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,.3)', display:'grid', placeItems:'center', padding:12}}>
-      <div style={{background:'#fff', border:'1px solid #ddd', borderRadius:12, padding:14, width:'100%', maxWidth:480}}>
+      <div style={{background:'#fff', border:'1px solid #ddd', borderRadius:12, padding:14, width:'100%', maxWidth:500}}>
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
           <div style={{fontWeight:700}}>Logga en öl</div>
           <button onClick={onClose} style={{color:'#666'}}>✕</button>
@@ -153,7 +171,7 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
             {['Helsingborg','Stockholm','Göteborg','Malmö'].map(c=><option key={c} value={c}>{c}</option>)}
           </select>
 
-          {/* Venue combobox */}
+          {/* Venue combobox (direct DB) */}
           <div ref={venueBoxRef} style={{position:'relative'}}>
             <input
               value={venueName}
@@ -163,15 +181,15 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
               style={{width:'100%', padding:'8px 10px', border:'1px solid #ddd', borderRadius:10}}
             />
             {venueOpen && filteredVenues.length>0 && (
-              <div style={{position:'absolute', zIndex:20, top:'100%', left:0, right:0, background:'#fff', border:'1px solid #ddd', borderRadius:10, marginTop:4, maxHeight:180, overflow:'auto'}}>
-                {filteredVenues.map(n=>(
-                  <div key={n} onMouseDown={()=>{ setVenueName(n); setVenueOpen(false); }} style={{padding:'8px 10px', cursor:'pointer'}}>{n}</div>
+              <div style={{position:'absolute', zIndex:20, top:'100%', left:0, right:0, background:'#fff', border:'1px solid #ddd', borderRadius:10, marginTop:4, maxHeight:200, overflow:'auto'}}>
+                {filteredVenues.map(v=>(
+                  <div key={v.id} onMouseDown={()=>{ setVenueName(v.name); setVenueOpen(false); }} style={{padding:'8px 10px', cursor:'pointer'}}>{v.name}</div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Beer combobox */}
+          {/* Beer combobox (from nearby) */}
           <div ref={beerBoxRef} style={{position:'relative'}}>
             <input
               value={beer}
@@ -181,7 +199,7 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
               style={{width:'100%', padding:'8px 10px', border:'1px solid #ddd', borderRadius:10}}
             />
             {beerOpen && filteredBeers.length>0 && (
-              <div style={{position:'absolute', zIndex:20, top:'100%', left:0, right:0, background:'#fff', border:'1px solid #ddd', borderRadius:10, marginTop:4, maxHeight:180, overflow:'auto'}}>
+              <div style={{position:'absolute', zIndex:20, top:'100%', left:0, right:0, background:'#fff', border:'1px solid #ddd', borderRadius:10, marginTop:4, maxHeight:200, overflow:'auto'}}>
                 {filteredBeers.map(n=>(
                   <div key={n} onMouseDown={()=>{ setBeer(n); setBeerOpen(false); }} style={{padding:'8px 10px', cursor:'pointer'}}>{n}</div>
                 ))}
@@ -208,15 +226,21 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
             <span style={{position:'absolute', right:10, top:8, color:'#555'}}>kr</span>
           </div>
 
-          {/* Rating with live number */}
+          {/* Rating with live number and points preview */}
           <div style={{display:'flex', alignItems:'center', gap:8}}>
             <input type="range" min={0} max={5} step={0.5} value={rating} onChange={e=>setRating(parseFloat(e.target.value))} style={{flex:1}}/>
-            <div style={{minWidth:48, textAlign:'right'}}>⭐ {rating.toFixed(1)}</div>
+            <div style={{minWidth:120, textAlign:'right'}}>
+              <div>⭐ {rating.toFixed(1)}</div>
+              <div style={{fontWeight:700, color:'#0a7f5a'}}>+{pointsPreview} p</div>
+            </div>
           </div>
         </div>
-        <div style={{display:'flex', justifyContent:'flex-end', gap:8, marginTop:10}}>
-          <button onClick={onClose} style={{padding:'8px 12px', borderRadius:10, border:'1px solid #ddd'}}>Avbryt</button>
-          <button onClick={save} style={{padding:'8px 12px', borderRadius:10, background:'#059669', color:'#fff', fontWeight:700}}>Spara</button>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10}}>
+          <div style={{fontSize:12, color:'#666'}}>Poäng: 5 bas {isFirstLogger ? '+ 10 först på plats' : ''}</div>
+          <div style={{display:'flex', gap:8}}>
+            <button onClick={onClose} style={{padding:'8px 12px', borderRadius:10, border:'1px solid #ddd'}}>Avbryt</button>
+            <button onClick={save} style={{padding:'8px 12px', borderRadius:10, background:'#059669', color:'#fff', fontWeight:700}}>Spara</button>
+          </div>
         </div>
       </div>
     </div>
