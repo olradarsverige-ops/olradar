@@ -1,15 +1,15 @@
 
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 
-type Deal = { beer: string; style: string; price: number; rating: number; updatedAt: string };
-type Venue = { id: string; name: string; city: string; deals: Deal[]; openNow: boolean };
-type VenueLite = { id: string; name: string; city: string };
+type Deal = { beer: string; style: string; price: number; rating: number; updatedAt: string; verified?: boolean; photoUrl?: string|null };
+type Venue = { id: string; name: string; city: string; lat?: number|null; lng?: number|null; deals: Deal[]; openNow: boolean };
+type VenueLite = { id: string; name: string; city: string; lat?: number|null; lng?: number|null };
 
 const CITIES = ['Helsingborg','Stockholm','Göteborg','Malmö'] as const;
 type City = typeof CITIES[number];
 
-// Expanded styles
 const STYLES = [
   'Lager','Pilsner','Helles','Kölsch','Märzen','Dunkel','Bock','Doppelbock',
   'IPA','New England IPA','Session IPA','Double IPA','Pale Ale','APA','Amber Ale','Brown Ale',
@@ -18,11 +18,22 @@ const STYLES = [
   'Sour','Berliner Weisse','Gose'
 ] as const;
 
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+
+function haversineKm(a:{lat:number,lng:number}, b:{lat:number,lng:number}){
+  const toRad = (x:number)=>x*Math.PI/180;
+  const R=6371;
+  const dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
+  const s=Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(s));
+}
+
 export default function Page(){
   const [city, setCity] = useState<City>('Helsingborg');
   const [venues, setVenues] = useState<Venue[]>([]);
   const [q, setQ] = useState('');
   const [style, setStyle] = useState('');
+  const [sort, setSort] = useState<'default'|'cheap'>('default');
   const [openLog, setOpenLog] = useState(false);
 
   async function load(){
@@ -33,12 +44,20 @@ export default function Page(){
   useEffect(()=>{ load(); }, [city]);
 
   const filtered = useMemo(()=>{
-    return venues.filter(v => {
+    let list = venues.filter(v => {
       const t = (v.name + ' ' + v.city).toLowerCase().includes(q.toLowerCase());
       const okStyle = style ? v.deals?.some(d=>d.style===style) : true;
       return t && okStyle;
     });
-  }, [venues, q, style]);
+    if (sort==='cheap'){
+      list = [...list].sort((a,b)=>{
+        const minA = a.deals?.length? Math.min(...a.deals.map(d=>d.price)) : Number.POSITIVE_INFINITY;
+        const minB = b.deals?.length? Math.min(...b.deals.map(d=>d.price)) : Number.POSITIVE_INFINITY;
+        return minA - minB;
+      });
+    }
+    return list;
+  }, [venues, q, style, sort]);
 
   return (
     <main style={{maxWidth:1000,margin:'20px auto',padding:'0 16px'}}>
@@ -61,6 +80,10 @@ export default function Page(){
           <option value="">Alla stilar</option>
           {STYLES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
+        <select value={sort} onChange={e=>setSort(e.target.value as any)} style={{padding:'8px 10px', borderRadius:10, border:'1px solid #ddd'}}>
+          <option value="default">Standard</option>
+          <option value="cheap">Billigast först</option>
+        </select>
       </div>
 
       <div className="grid" style={{display:'grid', gridTemplateColumns:'1fr', gap:12}}>
@@ -72,7 +95,10 @@ export default function Page(){
             </div>
             <div style={{display:'flex', gap:8, overflowX:'auto', marginTop:8}}>
               {v.deals?.map((d,i)=>(
-                <div key={i} style={{minWidth:200, border:'1px solid #eee', borderRadius:10, padding:10}}>
+                <div key={i} style={{minWidth:200, border:'1px solid #eee', borderRadius:10, padding:10, position:'relative'}}>
+                  {/* badges */}
+                  {d.verified && <span style={{position:'absolute', top:6, right:6, background:'#dcfce7', color:'#166534', fontSize:10, padding:'2px 6px', borderRadius:999}}>Verifierad</span>}
+                  {d.photoUrl && <span title="Foto finns" style={{position:'absolute', top:6, left:6, fontSize:12}}>📷</span>}
                   <div style={{fontWeight:600, fontSize:14}}>{d.beer}</div>
                   <div style={{fontSize:12, color:'#666'}}>{d.style}</div>
                   <div style={{fontWeight:600}}>{d.price} kr</div>
@@ -112,9 +138,14 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
   const [style, setStyle] = useState<string>('Lager');
   const [price, setPrice] = useState(59);
   const [rating, setRating] = useState(4);
-
-  // Suggestions from /api/venues (direct DB) and from nearby deals for beer names
+  const [verified, setVerified] = useState(false);
+  const [photo, setPhoto] = useState<File|null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string|null>(null);
+  const [coords, setCoords] = useState<{lat:number; lng:number}|null>(null);
+  const [uploading, setUploading] = useState(false);
   const [venuePool, setVenuePool] = useState<VenueLite[]>([]);
+  const [distanceOk, setDistanceOk] = useState(true);
+
   useEffect(()=>{
     fetch('/api/venues?city='+encodeURIComponent(city))
       .then(r=>r.json()).then(setVenuePool).catch(()=>setVenuePool([]));
@@ -126,7 +157,6 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
     return Array.from(s).sort();
   }, [venues, city]);
 
-  // simple comboboxes
   const [venueOpen, setVenueOpen] = useState(false);
   const [beerOpen, setBeerOpen] = useState(false);
   const venueBoxRef = useRef<HTMLDivElement>(null);
@@ -141,37 +171,86 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
       .filter(n => n.toLowerCase().includes(beer.toLowerCase()))
       .slice(0,8), [beerSource, beer]);
 
-  // Point preview: base 5 +10 if first logger for this beer at venue (naive check)
+  // GPS capture if verified toggled
+  useEffect(()=>{
+    if (!verified) { setCoords(null); setDistanceOk(true); return; }
+    if (!navigator.geolocation) { setCoords(null); setDistanceOk(false); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos)=> {
+        const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setCoords(c);
+        // compute distance if venue known with coords
+        const v = venuePool.find(x => x.name.toLowerCase() === venueName.toLowerCase());
+        if (v && v.lat && v.lng){
+          const km = haversineKm(c, {lat: v.lat, lng: v.lng});
+          setDistanceOk(km <= 0.1); // 100 m
+        } else {
+          setDistanceOk(false);
+        }
+      },
+      ()=> { setCoords(null); setDistanceOk(false); },
+      { enableHighAccuracy: true, maximumAge: 60000, timeout: 8000 }
+    );
+  }, [verified, venueName, venuePool]);
+
   const existingVenue = useMemo(()=> venues.find(v => v.city===city && v.name.toLowerCase() === venueName.toLowerCase()), [venues, city, venueName]);
   const isFirstLogger = useMemo(()=> {
     if (!existingVenue || !existingVenue.deals) return true;
     return !existingVenue.deals.some(d => d.beer.toLowerCase() === beer.toLowerCase());
   }, [existingVenue, beer]);
-  const pointsPreview = 5 + (isFirstLogger ? 10 : 0); // could add +3 if verified later
+  const pointsPreview = 5 + (isFirstLogger ? 10 : 0) + (verified ? 3 : 0);
+
+  function onPhoto(e: React.ChangeEvent<HTMLInputElement>){
+    const f = e.target.files?.[0] || null;
+    setPhoto(f);
+    setPhotoPreview(f ? URL.createObjectURL(f) : null);
+  }
+
+  async function uploadPhotoIfAny(venueId: string){
+    if (!photo) return null;
+    setUploading(true);
+    const ext = photo.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const fileName = `${venueId}/${crypto.randomUUID()}.${ext}`;
+    const { data, error } = await supabase.storage.from('photos').upload(fileName, photo, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: photo.type || 'image/jpeg'
+    });
+    setUploading(false);
+    if (error) return null;
+    const { data: pub } = supabase.storage.from('photos').getPublicUrl(data.path);
+    return pub?.publicUrl || null;
+  }
 
   async function save(){
+    const venueId = (venueName || 'okand').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    const photoUrl = await uploadPhotoIfAny(venueId);
     await fetch('/api/log', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ city, venueName, beerName: beer, style, price, rating, verified:false, photoUrl:null })
+      body: JSON.stringify({
+        city, venueName, beerName: beer, style, price, rating,
+        verified, photoUrl, coords
+      })
     });
     onSaved();
   }
 
+  const canSave = (!verified || distanceOk) && !!venueName && !!beer && price>0;
+
   return (
     <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,.3)', display:'grid', placeItems:'center', padding:12}}>
-      <div style={{background:'#fff', border:'1px solid #ddd', borderRadius:12, padding:14, width:'100%', maxWidth:500}}>
+      <div style={{background:'#fff', border:'1px solid #ddd', borderRadius:12, padding:14, width:'100%', maxWidth:560}}>
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
           <div style={{fontWeight:700}}>Logga en öl</div>
           <button onClick={onClose} style={{color:'#666'}}>✕</button>
         </div>
         <div style={{display:'grid', gap:8, marginTop:8}}>
-          {/* Stad */}
           <select value={city} onChange={e=>setCity(e.target.value)}>
             {['Helsingborg','Stockholm','Göteborg','Malmö'].map(c=><option key={c} value={c}>{c}</option>)}
           </select>
 
-          {/* Venue combobox (direct DB) */}
+          {/* Venue combobox */}
           <div ref={venueBoxRef} style={{position:'relative'}}>
             <input
               value={venueName}
@@ -189,7 +268,7 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
             )}
           </div>
 
-          {/* Beer combobox (from nearby) */}
+          {/* Beer combobox */}
           <div ref={beerBoxRef} style={{position:'relative'}}>
             <input
               value={beer}
@@ -207,12 +286,10 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
             )}
           </div>
 
-          {/* Style dropdown (expanded list) */}
           <select value={style} onChange={e=>setStyle(e.target.value)} style={{padding:'8px 10px', border:'1px solid #ddd', borderRadius:10}}>
             {STYLES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
 
-          {/* Price with suffix */}
           <div style={{position:'relative'}}>
             <input
               type="number"
@@ -226,20 +303,42 @@ function LogModal({ defaultCity, venues, onClose, onSaved }:{ defaultCity: strin
             <span style={{position:'absolute', right:10, top:8, color:'#555'}}>kr</span>
           </div>
 
-          {/* Rating with live number and points preview */}
           <div style={{display:'flex', alignItems:'center', gap:8}}>
             <input type="range" min={0} max={5} step={0.5} value={rating} onChange={e=>setRating(parseFloat(e.target.value))} style={{flex:1}}/>
-            <div style={{minWidth:120, textAlign:'right'}}>
+            <div style={{minWidth:140, textAlign:'right'}}>
               <div>⭐ {rating.toFixed(1)}</div>
               <div style={{fontWeight:700, color:'#0a7f5a'}}>+{pointsPreview} p</div>
             </div>
           </div>
+
+          {/* Verified block */}
+          <div style={{border:'1px dashed #ddd', borderRadius:10, padding:10}}>
+            <label style={{display:'flex', alignItems:'center', gap:8}}>
+              <input type="checkbox" checked={verified} onChange={e=>setVerified(e.target.checked)} />
+              Verifierad med foto/GPS (+3 p)
+            </label>
+            {verified && (
+              <div style={{display:'grid', gap:8, marginTop:8}}>
+                <input type="file" accept="image/*" onChange={onPhoto} />
+                {photoPreview && <img src={photoPreview} alt="preview" style={{maxWidth:220, borderRadius:8, border:'1px solid #eee'}} />}
+                <div style={{fontSize:12, color: distanceOk ? '#166534' : '#991b1b'}}>
+                  {coords ? `GPS: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}` : 'GPS ej tillgänglig'}
+                  {' · '}
+                  {distanceOk ? 'Avstånd OK (<100 m)' : 'För långt från stället / saknar koordinater'}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10}}>
-          <div style={{fontSize:12, color:'#666'}}>Poäng: 5 bas {isFirstLogger ? '+ 10 först på plats' : ''}</div>
+          <div style={{fontSize:12, color:'#666'}}>
+            Poäng: 5 bas{isFirstLogger ? ' + 10 först på plats' : ''}{verified ? ' + 3 verifierad' : ''}
+          </div>
           <div style={{display:'flex', gap:8}}>
             <button onClick={onClose} style={{padding:'8px 12px', borderRadius:10, border:'1px solid #ddd'}}>Avbryt</button>
-            <button onClick={save} style={{padding:'8px 12px', borderRadius:10, background:'#059669', color:'#fff', fontWeight:700}}>Spara</button>
+            <button onClick={save} disabled={!canSave || uploading} style={{padding:'8px 12px', borderRadius:10, background: (!canSave||uploading)?'#9ca3af':'#059669', color:'#fff', fontWeight:700}}>
+              {uploading ? 'Laddar upp...' : 'Spara'}
+            </button>
           </div>
         </div>
       </div>
